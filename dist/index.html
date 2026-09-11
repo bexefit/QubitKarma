@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PQC Vault — Seed Phrase (ML-KEM-512 + ML-DSA-44)</title>
+<style>
+  :root {
+    --bg: #0D1117;
+    --card-bg: #161B22;
+    --accent: #238636;
+    --accent-hover: #2EA043;
+    --border: #30363D;
+    --text: #C9D1D9;
+    --text-muted: #8B949E;
+    --mono: "IBM Plex Mono", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --err: #F85149;
+    --warn: #D29922;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); padding: 24px; line-height: 1.5; }
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+  h1 { margin: 0 0 8px; font-size: 1.4rem; color: #FFF; }
+  .status-bar { font-family: var(--mono); font-size: 0.8rem; color: var(--text-muted); }
+
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .card-title { font-family: var(--mono); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-bottom: 12px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
+
+  label { display: block; font-family: var(--mono); font-size: 0.75rem; color: var(--text-muted); margin: 10px 0 4px; }
+  textarea, input[type="text"], select {
+    width: 100%; font-family: var(--mono); font-size: 0.8rem; padding: 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: #0D1117; color: var(--text);
+  }
+  textarea { resize: vertical; }
+  textarea:focus, input:focus, select:focus { outline: none; border-color: #58A6FF; }
+
+  .btn-group { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    font-family: var(--sans); font-size: 0.8rem; font-weight: 600; padding: 8px 16px;
+    border: none; border-radius: 6px; cursor: pointer; background: var(--accent); color: #FFF;
+    transition: background 0.2s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary { background: #21262D; color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { background: #30363D; }
+  button.big { font-size: 0.95rem; padding: 16px 20px; flex: 1; min-width: 220px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-tag { font-family: var(--mono); font-size: 0.8rem; margin-top: 10px; padding: 8px 12px; border-radius: 4px; display: none; }
+  .status-tag.ok { display: block; background: rgba(35, 134, 54, 0.15); color: #3FB950; border: 1px solid #238636; }
+  .status-tag.err { display: block; background: rgba(248, 81, 73, 0.15); color: var(--err); border: 1px solid var(--err); }
+  .status-tag.warn { display: block; background: rgba(210, 153, 34, 0.15); color: var(--warn); border: 1px solid var(--warn); }
+
+  .key-loaded-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; font-weight: normal; }
+  .key-loaded-badge.yes { background: rgba(63, 185, 80, 0.2); color: #3FB950; border: 1px solid #3FB950; }
+  .key-loaded-badge.no { background: rgba(248, 81, 73, 0.2); color: var(--err); border: 1px solid var(--err); }
+
+  .hint { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 10px; }
+
+  .mnemonic-box {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    background: #0D1117; border: 1px solid var(--warn); border-radius: 6px; padding: 16px; margin-top: 12px;
+  }
+  .mnemonic-word {
+    font-family: var(--mono); font-size: 0.82rem; background: #161B22; border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 8px; display: flex; gap: 6px;
+  }
+  .mnemonic-word .idx { color: var(--text-muted); min-width: 18px; }
+
+  .warn-box {
+    background: rgba(210, 153, 34, 0.1); border: 1px solid var(--warn); color: var(--warn);
+    border-radius: 6px; padding: 12px 14px; font-size: 0.82rem; margin-top: 12px;
+  }
+
+  .grid-workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  @media (min-width: 850px) {
+    .grid-workspace {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .save-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  #landing { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hidden { display: none !important; }
+</style>
+
+<!-- Load bundled IIFE file -->
+<script src="./pqc-vault.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>PQC Vault — ML-KEM-512 + ML-DSA-44</h1>
+    <div class="status-bar" id="status">Loading NIST FIPS 203 / FIPS 204 Engine…</div>
+  </header>
+
+  <div class="card" id="landing-card">
+    <div class="card-title"><span>Get Started</span></div>
+    <p class="hint">Your seed phrase is the only thing that can regenerate your ML-KEM-512 (encryption) and ML-DSA-44 (signing) keypairs. There is no password and nothing else to remember — treat it exactly like a crypto wallet seed phrase.</p>
+    <div id="landing" class="btn-group">
+      <button class="big" id="btn-show-unlock" disabled>Unlock with Seed Phrase</button>
+      <button class="big secondary" id="btn-show-create" disabled>Create New Seed Phrase</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="create-card">
+    <div class="card-title"><span>Create New Seed Phrase</span></div>
+    <p class="hint">This generates a 24-word seed phrase (256 bits of entropy), then deterministically derives your ML-KEM-512 and ML-DSA-44 keypairs from it. Anyone with these 24 words can regenerate both private keys — write them down somewhere offline and safe.</p>
+    <button id="btn-generate-seed">Generate Seed Phrase</button>
+
+    <div id="mnemonic-reveal" class="hidden">
+      <div class="mnemonic-box" id="mnemonic-box"></div>
+      <div class="warn-box">
+        This is shown only once. Nothing is saved anywhere by this page. If you lose these words, your keys — and anything encrypted to them — are gone for good.
+      </div>
+      <div class="btn-group">
+        <button class="secondary" id="btn-copy-mnemonic">Copy Seed Phrase</button>
+        <button id="btn-confirm-saved">I've Saved My Seed Phrase — Load Keys</button>
+      </div>
+    </div>
+    <div id="create-status" class="status-tag"></div>
+  </div>
+
+  <div class="card hidden" id="unlock-card">
+    <div class="card-title"><span>Unlock with Seed Phrase</span></div>
+    <p class="hint">Enter your 12 or 24-word seed phrase, separated by spaces, in order.</p>
+    <textarea id="seed-input" rows="3" placeholder="word1 word2 word3 ..."></textarea>
+    <div class="btn-group">
+      <button id="btn-unlock-seed">Load Keys from Seed Phrase</button>
+    </div>
+    <div id="unlock-status" class="status-tag"></div>
+  </div>
+
+  <div class="card hidden" id="keys-card">
+    <div class="card-title">
+      <span>Active Keys Control</span>
+      <span id="key-state-badge" class="key-loaded-badge yes">Private Keys Active in Memory</span>
+    </div>
+    <p class="hint">Public keys are hidden from display. Click below to copy your public keys to the clipboard for sharing.</p>
+    <div class="btn-group">
+      <button class="secondary" id="btn-copy-kem-pub">Click to Copy ML-KEM Public Key</button>
+      <button class="secondary" id="btn-copy-dsa-pub">Click to Copy ML-DSA Public Key</button>
+      <button class="secondary" id="btn-lock" style="margin-left: auto;">Lock (Clear Keys from Memory)</button>
+    </div>
+    <div id="copy-status" class="status-tag"></div>
+  </div>
+
+  <div class="grid-workspace hidden" id="workspace">
+    <div class="card" id="encrypt-card">
+      <div class="card-title">Sign &amp; Encrypt Message for Recipient</div>
+      <p class="hint">Signs the message with your ML-DSA-44 key, then encrypts message+signature to the recipient's ML-KEM-512 public key.</p>
+
+      <label>RECIPIENT'S ML-KEM-512 PUBLIC KEY</label>
+      <textarea id="target-pub-key" rows="2" placeholder="Paste recipient's public key here (auto-filled with your own for self-test)"></textarea>
+
+      <label>PLAINTEXT MESSAGE</label>
+      <textarea id="plain-input" rows="4">Secret post-quantum message.</textarea>
+
+      <div class="btn-group">
+        <button id="btn-encrypt">Sign &amp; Encrypt Message</button>
+        <button class="secondary hidden" id="btn-copy-cipher">Click to Copy Encrypted Bundle</button>
+      </div>
+
+      <div id="save-bundle-container" class="hidden save-group">
+        <input type="text" id="bundle-name-input" placeholder="Insert a name" />
+        <button id="btn-save-db" style="white-space: nowrap;">Click to Save</button>
+      </div>
+
+      <div id="encrypt-status" class="status-tag"></div>
+    </div>
+
+    <div class="card" id="decrypt-card">
+      <div class="card-title">Decrypt &amp; Verify Message</div>
+      <p class="hint">Decrypts using your ML-KEM-512 key, then verifies the recovered signature against the sender's ML-DSA-44 public key.</p>
+
+      <label>SELECT SAVED CIPHER BUNDLE</label>
+      <select id="saved-bundles-select">
+        <option value="">-- Choose a saved bundle --</option>
+      </select>
+
+      <label>ENCRYPTED CIPHER BUNDLE</label>
+      <textarea id="cipher-input" rows="3" placeholder="Paste encrypted cipher bundle here"></textarea>
+
+      <label>SENDER'S ML-DSA-44 PUBLIC KEY (defaults to your own for self-test)</label>
+      <textarea id="sender-dsa-pub-key" rows="2" placeholder="Paste sender's ML-DSA-44 public key here"></textarea>
+
+      <div class="btn-group">
+        <button id="btn-decrypt">Decrypt &amp; Verify Message</button>
+        <button class="secondary hidden" id="btn-copy-decrypted">Click to Copy Decrypted Result</button>
+      </div>
+
+      <div id="decrypt-status" class="status-tag"></div>
+      <div id="verify-status" class="status-tag"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let ml_kem512, ml_dsa44, randomBytes, bip39, wordlist;
+
+  let activeKemSecretKey = null;
+  let activeKemPublicKey = null;
+  let activeDsaSecretKey = null;
+  let activeDsaPublicKey = null;
+  let latestCipherBundle = "";
+  let latestDecryptedMessage = "";
+
+  const DB_NAME = 'PQCVaultDB';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'cipher_bundles';
+
+  const $ = id => document.getElementById(id);
+  const b64 = bytes => btoa(String.fromCharCode(...bytes));
+  const unb64 = str => Uint8Array.from(atob(str.trim()), c => c.charCodeAt(0));
+  const show = id => $(id).classList.remove('hidden');
+  const hide = id => $(id).classList.add('hidden');
+
+  function showStatus(elId, text, type) {
+    const el = $(elId);
+    el.textContent = text;
+    el.className = 'status-tag ' + type;
+  }
+
+  // --- IndexedDB Operations ---
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function saveBundleToDB(name, bundle) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.add({ name, bundle, timestamp: new Date().toISOString() });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function getAllBundlesFromDB() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function updateSavedBundlesDropdown() {
+    try {
+      const bundles = await getAllBundlesFromDB();
+      const select = $('saved-bundles-select');
+      select.innerHTML = '<option value="">-- Choose a saved bundle --</option>';
+      bundles.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.bundle;
+        option.textContent = item.name;
+        select.appendChild(option);
+      });
+    } catch (e) {
+      console.error('Failed to load saved bundles from IndexedDB:', e);
+    }
+  }
+
+  async function deriveKeysFromMnemonic(mnemonic) {
+    const masterSeed = await bip39.mnemonicToSeed(mnemonic);
+
+    const hkdfKey = await crypto.subtle.importKey('raw', masterSeed, 'HKDF', false, ['deriveBits']);
+    const salt = new TextEncoder().encode('pqc-vault-seed-hkdf-v1');
+
+    const kemSeedBits = await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-512', salt, info: new TextEncoder().encode('ML-KEM-512') },
+      hkdfKey, 64 * 8
+    );
+    const dsaSeedBits = await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-512', salt, info: new TextEncoder().encode('ML-DSA-44') },
+      hkdfKey, 32 * 8
+    );
+
+    const kemSeed = new Uint8Array(kemSeedBits);
+    const dsaSeed = new Uint8Array(dsaSeedBits);
+
+    const kemKeys = ml_kem512.keygen(kemSeed);
+    const dsaKeys = ml_dsa44.keygen(dsaSeed);
+    return { kemKeys, dsaKeys };
+  }
+
+  function activateKeys(kemKeys, dsaKeys) {
+    activeKemSecretKey = kemKeys.secretKey;
+    activeKemPublicKey = kemKeys.publicKey;
+    activeDsaSecretKey = dsaKeys.secretKey;
+    activeDsaPublicKey = dsaKeys.publicKey;
+
+    $('target-pub-key').value = b64(activeKemPublicKey);
+    $('sender-dsa-pub-key').value = b64(activeDsaPublicKey);
+
+    hide('landing-card'); hide('create-card'); hide('unlock-card');
+    show('keys-card'); show('workspace');
+    updateSavedBundlesDropdown();
+  }
+
+  function lockKeys() {
+    activeKemSecretKey = null; activeKemPublicKey = null;
+    activeDsaSecretKey = null; activeDsaPublicKey = null;
+    latestCipherBundle = "";
+    latestDecryptedMessage = "";
+    hide('keys-card'); hide('workspace');
+    hide('create-card'); hide('unlock-card');
+    hide('btn-copy-cipher');
+    hide('save-bundle-container');
+    hide('btn-copy-decrypted');
+    $('encrypt-status').className = 'status-tag';
+    $('decrypt-status').className = 'status-tag';
+    $('verify-status').className = 'status-tag';
+    $('mnemonic-reveal') && hide('mnemonic-reveal');
+    $('seed-input').value = '';
+    $('bundle-name-input').value = '';
+    show('landing-card');
+  }
+
+  function initEngine() {
+    try {
+      if (!window.CryptoEngine) {
+        throw new Error("CryptoEngine script not loaded.");
+      }
+      
+      ml_kem512   = window.CryptoEngine.ml_kem512;
+      ml_dsa44    = window.CryptoEngine.ml_dsa44;
+      randomBytes = window.CryptoEngine.randomBytes;
+      bip39       = window.CryptoEngine.bip39;
+      wordlist    = window.CryptoEngine.wordlist;
+
+      $('status').textContent = 'ML-KEM-512 + ML-DSA-44 + BIP39 Engine Ready';
+      document.querySelectorAll('button').forEach(b => b.disabled = false);
+      updateSavedBundlesDropdown();
+    } catch (e) {
+      $('status').textContent = 'Failed to load crypto engine: ' + e.message;
+      $('status').style.color = 'var(--err)';
+    }
+  }
+
+  $('btn-show-unlock').addEventListener('click', () => { hide('landing-card'); show('unlock-card'); });
+  $('btn-show-create').addEventListener('click', () => { hide('landing-card'); show('create-card'); });
+
+  let pendingMnemonic = null;
+
+  $('btn-generate-seed').addEventListener('click', () => {
+    try {
+      pendingMnemonic = bip39.generateMnemonic(wordlist, 256);
+      const words = pendingMnemonic.split(' ');
+      $('mnemonic-box').innerHTML = words.map((w, i) =>
+        `<div class="mnemonic-word"><span class="idx">${i + 1}.</span>${w}</div>`
+      ).join('');
+      show('mnemonic-reveal');
+      showStatus('create-status', '', '');
+      $('create-status').className = 'status-tag';
+    } catch (e) {
+      showStatus('create-status', 'Error generating seed phrase: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-copy-mnemonic').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(pendingMnemonic);
+      showStatus('create-status', 'Seed phrase copied to clipboard.', 'ok');
+    } catch (e) {
+      showStatus('create-status', 'Could not copy automatically — please select and copy manually.', 'warn');
+    }
+  });
+
+  $('btn-confirm-saved').addEventListener('click', async () => {
+    try {
+      const { kemKeys, dsaKeys } = await deriveKeysFromMnemonic(pendingMnemonic);
+      activateKeys(kemKeys, dsaKeys);
+      pendingMnemonic = null;
+    } catch (e) {
+      showStatus('create-status', 'Key derivation error: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-unlock-seed').addEventListener('click', async () => {
+    const raw = $('seed-input').value.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!raw) {
+      showStatus('unlock-status', 'Please enter your seed phrase.', 'err');
+      return;
+    }
+    if (!bip39.validateMnemonic(raw, wordlist)) {
+      showStatus('unlock-status', 'That seed phrase is not valid. Double-check each word.', 'err');
+      return;
+    }
+    try {
+      const { kemKeys, dsaKeys } = await deriveKeysFromMnemonic(raw);
+      activateKeys(kemKeys, dsaKeys);
+    } catch (e) {
+      showStatus('unlock-status', 'Key derivation error: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-copy-kem-pub').addEventListener('click', async () => {
+    if (!activeKemPublicKey) return;
+    try {
+      await navigator.clipboard.writeText(b64(activeKemPublicKey));
+      showStatus('copy-status', 'ML-KEM-512 Public Key copied to clipboard!', 'ok');
+    } catch (e) {
+      showStatus('copy-status', 'Failed to copy key: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-copy-dsa-pub').addEventListener('click', async () => {
+    if (!activeDsaPublicKey) return;
+    try {
+      await navigator.clipboard.writeText(b64(activeDsaPublicKey));
+      showStatus('copy-status', 'ML-DSA-44 Public Key copied to clipboard!', 'ok');
+    } catch (e) {
+      showStatus('copy-status', 'Failed to copy key: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-lock').addEventListener('click', lockKeys);
+
+  $('btn-encrypt').addEventListener('click', async () => {
+    const targetPubKeyB64 = $('target-pub-key').value.trim();
+    const plainText = $('plain-input').value;
+
+    if (!targetPubKeyB64) { alert("Please provide a recipient public key."); return; }
+    if (!activeDsaSecretKey) { alert("No active key — unlock or create a seed phrase first."); return; }
+
+    try {
+      const msgBytes = new TextEncoder().encode(plainText);
+      const signature = ml_dsa44.sign(msgBytes, activeDsaSecretKey);
+
+      const lenBuf = new Uint8Array(4);
+      new DataView(lenBuf.buffer).setUint32(0, msgBytes.length);
+      const payload = new Uint8Array(lenBuf.length + msgBytes.length + signature.length);
+      payload.set(lenBuf, 0);
+      payload.set(msgBytes, lenBuf.length);
+      payload.set(signature, lenBuf.length + msgBytes.length);
+
+      const pubKeyBytes = unb64(targetPubKeyB64);
+      const { cipherText: kemCipherText, sharedSecret } = ml_kem512.encapsulate(pubKeyBytes);
+
+      const aesKey = await crypto.subtle.importKey('raw', sharedSecret, 'AES-GCM', false, ['encrypt']);
+      const iv = randomBytes(12);
+      const aesCipherText = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, payload);
+
+      latestCipherBundle = `${b64(kemCipherText)}:${b64(iv)}:${b64(new Uint8Array(aesCipherText))}`;
+      $('cipher-input').value = latestCipherBundle;
+
+      show('btn-copy-cipher');
+      show('save-bundle-container');
+      showStatus('encrypt-status', 'Message encrypted! You can now copy or save the cipher bundle.', 'ok');
+    } catch (e) {
+      showStatus('encrypt-status', 'Sign/encrypt failed: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-save-db').addEventListener('click', async () => {
+    const bundleName = $('bundle-name-input').value.trim();
+    if (!bundleName) {
+      showStatus('encrypt-status', 'Please enter a name before saving.', 'err');
+      return;
+    }
+    if (!latestCipherBundle) {
+      showStatus('encrypt-status', 'No encrypted bundle available to save.', 'err');
+      return;
+    }
+
+    try {
+      await saveBundleToDB(bundleName, latestCipherBundle);
+      await updateSavedBundlesDropdown();
+      showStatus('encrypt-status', `Bundle "${bundleName}" saved to IndexedDB successfully!`, 'ok');
+      $('bundle-name-input').value = '';
+    } catch (e) {
+      showStatus('encrypt-status', 'Failed to save bundle: ' + e.message, 'err');
+    }
+  });
+
+  $('saved-bundles-select').addEventListener('change', (e) => {
+    const selectedBundle = e.target.value;
+    if (selectedBundle) {
+      $('cipher-input').value = selectedBundle;
+    }
+  });
+
+  $('btn-copy-cipher').addEventListener('click', async () => {
+    if (!latestCipherBundle) return;
+    try {
+      await navigator.clipboard.writeText(latestCipherBundle);
+      showStatus('encrypt-status', 'Encrypted cipher bundle copied to clipboard!', 'ok');
+    } catch (e) {
+      showStatus('encrypt-status', 'Failed to copy cipher bundle: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-decrypt').addEventListener('click', async () => {
+    $('verify-status').className = 'status-tag';
+    hide('btn-copy-decrypted');
+    latestDecryptedMessage = "";
+
+    if (!activeKemSecretKey) {
+      showStatus('decrypt-status', 'No active key. Unlock or create a seed phrase first.', 'err');
+      return;
+    }
+
+    const bundleString = $('cipher-input').value.trim();
+    const parts = bundleString.split(':');
+    if (parts.length !== 3) {
+      showStatus('decrypt-status', 'Invalid bundle format. Expected 3 colon-separated fields.', 'err');
+      return;
+    }
+
+    let recoveredMessage, recoveredSig;
+    try {
+      const [kemCtB64, ivB64, aesCtB64] = parts;
+      const sharedSecret = ml_kem512.decapsulate(unb64(kemCtB64), activeKemSecretKey);
+
+      const aesKey = await crypto.subtle.importKey('raw', sharedSecret, 'AES-GCM', false, ['decrypt']);
+      const decryptedBuf = new Uint8Array(await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: unb64(ivB64) }, aesKey, unb64(aesCtB64)
+      ));
+
+      const msgLen = new DataView(decryptedBuf.buffer).getUint32(0);
+      const msgBytes = decryptedBuf.slice(4, 4 + msgLen);
+      recoveredSig = decryptedBuf.slice(4 + msgLen);
+      recoveredMessage = new TextDecoder().decode(msgBytes);
+
+      latestDecryptedMessage = recoveredMessage;
+      show('btn-copy-decrypted');
+      showStatus('decrypt-status', 'Message decrypted successfully! Click "Click to Copy Decrypted Result" to copy.', 'ok');
+    } catch (e) {
+      showStatus('decrypt-status', 'Decryption failed: ' + e.message, 'err');
+      return;
+    }
+
+    try {
+      const senderDsaPubB64 = $('sender-dsa-pub-key').value.trim();
+      if (!senderDsaPubB64) {
+        showStatus('verify-status', 'No sender public key provided — message decrypted but NOT verified.', 'warn');
+        return;
+      }
+      const senderDsaPub = unb64(senderDsaPubB64);
+      const valid = ml_dsa44.verify(recoveredSig, new TextEncoder().encode(recoveredMessage), senderDsaPub);
+      showStatus('verify-status', valid
+        ? 'Signature VALID — message is authentic and untampered.'
+        : 'Signature INVALID — message may be forged, corrupted, or from a different sender.', valid ? 'ok' : 'err');
+    } catch (e) {
+      showStatus('verify-status', 'Verification error: ' + e.message, 'err');
+    }
+  });
+
+  $('btn-copy-decrypted').addEventListener('click', async () => {
+    if (!latestDecryptedMessage) return;
+    try {
+      await navigator.clipboard.writeText(latestDecryptedMessage);
+      showStatus('decrypt-status', 'Decrypted message copied to clipboard!', 'ok');
+    } catch (e) {
+      showStatus('decrypt-status', 'Failed to copy decrypted message: ' + e.message, 'err');
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', initEngine);
+</script>
+</body>
+</html>
