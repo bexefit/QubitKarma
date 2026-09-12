@@ -629,9 +629,19 @@
     }
   });
 
+  function resetDecryptedResultState() {
+    latestDecryptedMessage = "";
+    hide('btn-copy-decrypted');
+    $('decrypt-status').className = 'status-tag';
+    $('verify-status').className = 'status-tag';
+  }
+
+  $('cipher-input').addEventListener('input', resetDecryptedResultState);
+
   // ---- Load a Saved Bundle into the Decrypt field ----
   $('saved-bundles-select').addEventListener('change', async (ev) => {
     const name = ev.target.value;
+    resetDecryptedResultState();
     if (!name) return;
     try {
       const record = await getBundleFromDb(name);
@@ -671,6 +681,7 @@
     const file = ev.target.files && ev.target.files[0];
     ev.target.value = ''; // allow re-importing the same file later
     if (!file) return;
+    resetDecryptedResultState();
     try {
       const text = await readFileAsText(file);
       const entries = parseBundlesFile(text);
