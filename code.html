@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PQC Vault — Seed Phrase (ML-KEM-512 + ML-DSA-44)</title>
+<title>PQC Vault — Seed Phrase (ML-KEM-768 + ML-DSA-65)</title>
 <style>
   :root {
     --bg: #0D1117;
@@ -26,17 +26,19 @@
   header { text-align: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
   h1 { margin: 0 0 8px; font-size: 1.4rem; color: #FFF; }
   .status-bar { font-family: var(--mono); font-size: 0.8rem; color: var(--text-muted); }
+  .security-badge { display: inline-block; margin-top: 8px; font-family: var(--mono); font-size: 0.72rem; padding: 3px 10px; border-radius: 12px; background: rgba(63,185,80,0.15); color: #3FB950; border: 1px solid #238636; }
 
   .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
   .card-title { font-family: var(--mono); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-bottom: 12px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
 
   label { display: block; font-family: var(--mono); font-size: 0.75rem; color: var(--text-muted); margin: 10px 0 4px; }
-  textarea, input[type="text"] {
+  textarea, input[type="text"], select {
     width: 100%; font-family: var(--mono); font-size: 0.8rem; padding: 10px;
     border: 1px solid var(--border); border-radius: 6px; background: #0D1117; color: var(--text);
   }
   textarea { resize: vertical; }
-  textarea:focus, input:focus { outline: none; border-color: #58A6FF; }
+  textarea:focus, input:focus, select:focus { outline: none; border-color: #58A6FF; }
+  select { cursor: pointer; }
 
   .btn-group { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   button {
@@ -96,14 +98,15 @@
 
 <div class="container">
   <header>
-    <h1>PQC Vault — ML-KEM-512 + ML-DSA-44</h1>
+    <h1>PQC Vault — ML-KEM-768 + ML-DSA-65</h1>
     <div class="status-bar" id="status">Loading NIST FIPS 203 / FIPS 204 Engine…</div>
+    <div class="security-badge">NIST Category 3 (≈AES-192 equivalent)</div>
   </header>
 
   <!-- LANDING: choice between unlock / create -->
   <div class="card" id="landing-card">
     <div class="card-title"><span>Get Started</span></div>
-    <p class="hint">Your seed phrase is the only thing that can regenerate your ML-KEM-512 (encryption) and ML-DSA-44 (signing) keypairs. There is no password and nothing else to remember — treat it exactly like a crypto wallet seed phrase.</p>
+    <p class="hint">Your seed phrase is the only thing that can regenerate your ML-KEM-768 (encryption) and ML-DSA-65 (signing) keypairs. There is no password and nothing else to remember — treat it exactly like a crypto wallet seed phrase.</p>
     <div id="landing" class="btn-group">
       <button class="big" id="btn-show-unlock">Unlock with Seed Phrase</button>
       <button class="big secondary" id="btn-show-create">Create New Seed Phrase</button>
@@ -113,7 +116,7 @@
   <!-- CREATE FLOW -->
   <div class="card hidden" id="create-card">
     <div class="card-title"><span>Create New Seed Phrase</span></div>
-    <p class="hint">This generates a 24-word seed phrase (256 bits of entropy), then deterministically derives your ML-KEM-512 and ML-DSA-44 keypairs from it. Anyone with these 24 words can regenerate both private keys — write them down somewhere offline and safe.</p>
+    <p class="hint">This generates a 24-word seed phrase (256 bits of entropy), then deterministically derives your ML-KEM-768 and ML-DSA-65 keypairs from it. Anyone with these 24 words can regenerate both private keys — write them down somewhere offline and safe.</p>
     <button id="btn-generate-seed">Generate Seed Phrase</button>
 
     <div id="mnemonic-reveal" class="hidden">
@@ -146,7 +149,7 @@
       <span>Active Keys Control</span>
       <span id="key-state-badge" class="key-loaded-badge yes">Private Keys Active in Memory</span>
     </div>
-    <p class="hint">Public keys are hidden from display. Click below to copy your public keys to the clipboard for sharing.</p>
+    <p class="hint">Public keys are hidden from display. Click below to copy your public keys to the clipboard for sharing. Verify public key fingerprints with your counterparty out-of-band before trusting them.</p>
     <div class="btn-group">
       <button class="secondary" id="btn-copy-kem-pub">Click to Copy ML-KEM Public Key</button>
       <button class="secondary" id="btn-copy-dsa-pub">Click to Copy ML-DSA Public Key</button>
@@ -160,9 +163,9 @@
     <!-- SIGN & ENCRYPT -->
     <div class="card" id="encrypt-card">
       <div class="card-title">Sign &amp; Encrypt Message for Recipient</div>
-      <p class="hint">Signs the message with your ML-DSA-44 key, then encrypts message+signature to the recipient's ML-KEM-512 public key.</p>
+      <p class="hint">Signs the message with your ML-DSA-65 key, then encrypts message+signature to the recipient's ML-KEM-768 public key.</p>
 
-      <label>RECIPIENT'S ML-KEM-512 PUBLIC KEY</label>
+      <label>RECIPIENT'S ML-KEM-768 PUBLIC KEY</label>
       <textarea id="target-pub-key" rows="2" placeholder="Paste recipient's public key here (auto-filled with your own for self-test)"></textarea>
 
       <label>PLAINTEXT MESSAGE</label>
@@ -173,19 +176,33 @@
         <button class="secondary hidden" id="btn-copy-cipher">Click to Copy Encrypted Bundle</button>
       </div>
 
+      <div id="save-bundle-row" class="hidden">
+        <label>SAVE THIS BUNDLE</label>
+        <input type="text" id="save-name-input" placeholder="Insert a name">
+        <div class="btn-group">
+          <button class="secondary" id="btn-save-bundle">Click to Save</button>
+        </div>
+      </div>
+
       <div id="encrypt-status" class="status-tag"></div>
+      <div id="save-status" class="status-tag"></div>
     </div>
 
     <!-- DECRYPT & VERIFY -->
     <div class="card" id="decrypt-card">
       <div class="card-title">Decrypt &amp; Verify Message</div>
-      <p class="hint">Decrypts using your ML-KEM-512 key, then verifies the recovered signature against the sender's ML-DSA-44 public key.</p>
+      <p class="hint">Decrypts using your ML-KEM-768 key, then verifies the recovered signature against the sender's ML-DSA-65 public key.</p>
 
       <label>ENCRYPTED CIPHER BUNDLE</label>
       <textarea id="cipher-input" rows="3" placeholder="Paste encrypted cipher bundle here"></textarea>
 
-      <label>SENDER'S ML-DSA-44 PUBLIC KEY (defaults to your own for self-test)</label>
-      <textarea id="sender-dsa-pub-key" rows="2" placeholder="Paste sender's ML-DSA-44 public key here"></textarea>
+      <label>OR LOAD A SAVED BUNDLE</label>
+      <select id="saved-bundles-select">
+        <option value="">-- Select a saved bundle --</option>
+      </select>
+
+      <label>SENDER'S ML-DSA-65 PUBLIC KEY (defaults to your own for self-test)</label>
+      <textarea id="sender-dsa-pub-key" rows="2" placeholder="Paste sender's ML-DSA-65 public key here"></textarea>
 
       <div class="btn-group">
         <button id="btn-decrypt">Decrypt &amp; Verify Message</button>
@@ -199,7 +216,7 @@
 </div>
 
 <script type="module">
-  let ml_kem512, ml_dsa44, randomBytes;
+  let ml_kem768, ml_dsa65, randomBytes;
   let bip39, wordlist;
 
   let activeKemSecretKey = null;
@@ -208,6 +225,7 @@
   let activeDsaPublicKey = null;
   let latestCipherBundle = "";
   let latestDecryptedMessage = "";
+  let vaultDb = null;
 
   const $ = id => document.getElementById(id);
   const b64 = bytes => btoa(String.fromCharCode(...bytes));
@@ -221,27 +239,100 @@
     el.className = 'status-tag ' + type;
   }
 
+  // ---- IndexedDB: saved encrypted bundles ----
+  // Stores only ciphertext bundles (already encrypted to a recipient's public
+  // key) under a user-chosen name, keyed on that name. Nothing plaintext or
+  // secret-key-related is ever written here.
+  function openVaultDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('pqcVaultDB', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('bundles')) {
+          db.createObjectStore('bundles', { keyPath: 'name' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function saveBundleToDb(name, bundle) {
+    return new Promise((resolve, reject) => {
+      if (!vaultDb) { reject(new Error('Database not ready')); return; }
+      const tx = vaultDb.transaction('bundles', 'readwrite');
+      tx.objectStore('bundles').put({ name, bundle, savedAt: Date.now() });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function getBundleFromDb(name) {
+    return new Promise((resolve, reject) => {
+      if (!vaultDb) { reject(new Error('Database not ready')); return; }
+      const tx = vaultDb.transaction('bundles', 'readonly');
+      const req = tx.objectStore('bundles').get(name);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function getAllBundleNamesFromDb() {
+    return new Promise((resolve, reject) => {
+      if (!vaultDb) { resolve([]); return; }
+      const tx = vaultDb.transaction('bundles', 'readonly');
+      const req = tx.objectStore('bundles').getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function refreshSavedBundlesDropdown() {
+    try {
+      const names = await getAllBundleNamesFromDb();
+      const select = $('saved-bundles-select');
+      const previousValue = select.value;
+      select.innerHTML = '<option value="">-- Select a saved bundle --</option>' +
+        names.map(n => `<option value="${escapeHtmlAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      if (names.includes(previousValue)) select.value = previousValue;
+    } catch (e) {
+      // Non-fatal — dropdown just stays empty/stale.
+      console.error('Failed to refresh saved bundle list:', e);
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+  function escapeHtmlAttr(str) { return escapeHtml(str); }
+
   // ---- Deterministic key derivation from a BIP39 seed phrase ----
+  // Note: ML-KEM keygen takes a 64-byte seed (d || z, 32 bytes each) and
+  // ML-DSA keygen takes a 32-byte seed (xi) — these lengths are fixed by
+  // FIPS 203 / FIPS 204 regardless of parameter set (512/768/1024, 44/65/87),
+  // so the HKDF output lengths below are unchanged from the 512/44 version.
   async function deriveKeysFromMnemonic(mnemonic) {
     const masterSeed = await bip39.mnemonicToSeed(mnemonic); // 64 bytes
 
     const hkdfKey = await crypto.subtle.importKey('raw', masterSeed, 'HKDF', false, ['deriveBits']);
-    const salt = new TextEncoder().encode('pqc-vault-seed-hkdf-v1');
+    const salt = new TextEncoder().encode('pqc-vault-seed-hkdf-v2-768-65');
 
     const kemSeedBits = await crypto.subtle.deriveBits(
-      { name: 'HKDF', hash: 'SHA-512', salt, info: new TextEncoder().encode('ML-KEM-512') },
+      { name: 'HKDF', hash: 'SHA-512', salt, info: new TextEncoder().encode('ML-KEM-768') },
       hkdfKey, 64 * 8
     );
     const dsaSeedBits = await crypto.subtle.deriveBits(
-      { name: 'HKDF', hash: 'SHA-512', salt, info: new TextEncoder().encode('ML-DSA-44') },
+      { name: 'HKDF', hash: 'SHA-512', salt, info: new TextEncoder().encode('ML-DSA-65') },
       hkdfKey, 32 * 8
     );
 
     const kemSeed = new Uint8Array(kemSeedBits);
     const dsaSeed = new Uint8Array(dsaSeedBits);
 
-    const kemKeys = ml_kem512.keygen(kemSeed);
-    const dsaKeys = ml_dsa44.keygen(dsaSeed);
+    const kemKeys = ml_kem768.keygen(kemSeed);
+    const dsaKeys = ml_dsa65.keygen(dsaSeed);
     return { kemKeys, dsaKeys };
   }
 
@@ -268,9 +359,12 @@
     hide('create-card'); hide('unlock-card');
     hide('btn-copy-cipher');
     hide('btn-copy-decrypted');
+    hide('save-bundle-row');
+    $('save-name-input').value = '';
     $('encrypt-status').className = 'status-tag';
     $('decrypt-status').className = 'status-tag';
     $('verify-status').className = 'status-tag';
+    $('save-status').className = 'status-tag';
     $('mnemonic-reveal') && hide('mnemonic-reveal');
     $('seed-input').value = '';
     show('landing-card');
@@ -285,14 +379,21 @@
       const bip39Mod = await import("https://cdn.jsdelivr.net/npm/@scure/bip39@2.4.0/+esm");
       const wlMod    = await import("https://cdn.jsdelivr.net/npm/@scure/bip39@2.4.0/wordlists/english.js/+esm");
 
-      ml_kem512 = kemMod.ml_kem512;
-      ml_dsa44  = dsaMod.ml_dsa44;
+      ml_kem768 = kemMod.ml_kem768;
+      ml_dsa65  = dsaMod.ml_dsa65;
       randomBytes = utils.randomBytes;
       bip39 = bip39Mod;
       wordlist = wlMod.wordlist;
 
-      $('status').textContent = 'ML-KEM-512 + ML-DSA-44 + BIP39 Engine Ready';
+      $('status').textContent = 'ML-KEM-768 + ML-DSA-65 + BIP39 Engine Ready';
       document.querySelectorAll('button').forEach(b => b.disabled = false);
+
+      try {
+        vaultDb = await openVaultDb();
+        await refreshSavedBundlesDropdown();
+      } catch (e) {
+        console.error('IndexedDB init failed:', e);
+      }
     } catch (e) {
       $('status').textContent = 'Failed to load crypto engine: ' + e.message;
       $('status').style.color = 'var(--err)';
@@ -364,7 +465,7 @@
     if (!activeKemPublicKey) return;
     try {
       await navigator.clipboard.writeText(b64(activeKemPublicKey));
-      showStatus('copy-status', 'ML-KEM-512 Public Key copied to clipboard!', 'ok');
+      showStatus('copy-status', 'ML-KEM-768 Public Key copied to clipboard!', 'ok');
     } catch (e) {
       showStatus('copy-status', 'Failed to copy key: ' + e.message, 'err');
     }
@@ -374,7 +475,7 @@
     if (!activeDsaPublicKey) return;
     try {
       await navigator.clipboard.writeText(b64(activeDsaPublicKey));
-      showStatus('copy-status', 'ML-DSA-44 Public Key copied to clipboard!', 'ok');
+      showStatus('copy-status', 'ML-DSA-65 Public Key copied to clipboard!', 'ok');
     } catch (e) {
       showStatus('copy-status', 'Failed to copy key: ' + e.message, 'err');
     }
@@ -393,7 +494,7 @@
 
     try {
       const msgBytes = new TextEncoder().encode(plainText);
-      const signature = ml_dsa44.sign(msgBytes, activeDsaSecretKey);
+      const signature = ml_dsa65.sign(msgBytes, activeDsaSecretKey);
 
       const lenBuf = new Uint8Array(4);
       new DataView(lenBuf.buffer).setUint32(0, msgBytes.length);
@@ -403,7 +504,7 @@
       payload.set(signature, lenBuf.length + msgBytes.length);
 
       const pubKeyBytes = unb64(targetPubKeyB64);
-      const { cipherText: kemCipherText, sharedSecret } = ml_kem512.encapsulate(pubKeyBytes);
+      const { cipherText: kemCipherText, sharedSecret } = ml_kem768.encapsulate(pubKeyBytes);
 
       const aesKey = await crypto.subtle.importKey('raw', sharedSecret, 'AES-GCM', false, ['encrypt']);
       const iv = randomBytes(12);
@@ -413,6 +514,8 @@
       $('cipher-input').value = latestCipherBundle;
 
       show('btn-copy-cipher');
+      show('save-bundle-row');
+      $('save-status').className = 'status-tag';
       showStatus('encrypt-status', 'Message encrypted! Click "Click to Copy Encrypted Bundle" to copy.', 'ok');
     } catch (e) {
       showStatus('encrypt-status', 'Sign/encrypt failed: ' + e.message, 'err');
@@ -427,6 +530,43 @@
       showStatus('encrypt-status', 'Encrypted cipher bundle copied to clipboard!', 'ok');
     } catch (e) {
       showStatus('encrypt-status', 'Failed to copy cipher bundle: ' + e.message, 'err');
+    }
+  });
+
+  // ---- Save Encrypted Bundle to IndexedDB ----
+  $('btn-save-bundle').addEventListener('click', async () => {
+    const name = $('save-name-input').value.trim();
+    if (!name) {
+      showStatus('save-status', 'Please enter a name for this bundle.', 'err');
+      return;
+    }
+    if (!latestCipherBundle) {
+      showStatus('save-status', 'No encrypted bundle to save yet.', 'err');
+      return;
+    }
+    try {
+      await saveBundleToDb(name, latestCipherBundle);
+      await refreshSavedBundlesDropdown();
+      showStatus('save-status', `Saved as "${name}".`, 'ok');
+    } catch (e) {
+      showStatus('save-status', 'Failed to save bundle: ' + e.message, 'err');
+    }
+  });
+
+  // ---- Load a Saved Bundle into the Decrypt field ----
+  $('saved-bundles-select').addEventListener('change', async (ev) => {
+    const name = ev.target.value;
+    if (!name) return;
+    try {
+      const record = await getBundleFromDb(name);
+      if (record) {
+        $('cipher-input').value = record.bundle;
+        showStatus('decrypt-status', `Loaded saved bundle "${name}" into the field above.`, 'ok');
+      } else {
+        showStatus('decrypt-status', `Could not find a saved bundle named "${name}".`, 'err');
+      }
+    } catch (e) {
+      showStatus('decrypt-status', 'Failed to load saved bundle: ' + e.message, 'err');
     }
   });
 
@@ -451,7 +591,7 @@
     let recoveredMessage, recoveredSig;
     try {
       const [kemCtB64, ivB64, aesCtB64] = parts;
-      const sharedSecret = ml_kem512.decapsulate(unb64(kemCtB64), activeKemSecretKey);
+      const sharedSecret = ml_kem768.decapsulate(unb64(kemCtB64), activeKemSecretKey);
 
       const aesKey = await crypto.subtle.importKey('raw', sharedSecret, 'AES-GCM', false, ['decrypt']);
       const decryptedBuf = new Uint8Array(await crypto.subtle.decrypt(
@@ -478,7 +618,7 @@
         return;
       }
       const senderDsaPub = unb64(senderDsaPubB64);
-      const valid = ml_dsa44.verify(recoveredSig, new TextEncoder().encode(recoveredMessage), senderDsaPub);
+      const valid = ml_dsa65.verify(recoveredSig, new TextEncoder().encode(recoveredMessage), senderDsaPub);
       showStatus('verify-status', valid
         ? 'Signature VALID — message is authentic and untampered.'
         : 'Signature INVALID — message may be forged, corrupted, or from a different sender.', valid ? 'ok' : 'err');
